@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Journelyst — Personal Travel Explorer</title>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-Z0D8RVYLP6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-Z0D8RVYLP6');
+</script>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Leaflet plugins -->
+<script src="https://unpkg.com/leaflet-ant-path@1.3.0/dist/leaflet-ant-path.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+
+<!-- Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- HEADER -->
+<header id="header">
+  <div class="logo"><i class="fa-solid fa-earth-americas"></i> Journelyst</div>
+  <div class="header-spacer"></div>
+  <button class="hdr-btn" id="btn-filter" data-tip="Filter trips" onclick="toggleFilter()">
+    <i class="fa-solid fa-sliders"></i> <span>Filter</span>
+  </button>
+  <button class="hdr-btn" id="btn-advanced" data-tip="Advanced data view" onclick="openAdvanced()">
+    <i class="fa-solid fa-database"></i> <span>Advanced</span>
+  </button>
+  <button class="hdr-btn" id="btn-settings" data-tip="Settings" onclick="toggleSettings()">
+    <i class="fa-solid fa-gear"></i>
+  </button>
+  <button class="hdr-btn" id="btn-share-all" data-tip="Share all trips" onclick="openShareAll()">
+    <i class="fa-solid fa-share-nodes"></i> <span>Share</span>
+  </button>
+  <button class="hdr-btn primary" id="btn-upload" onclick="openUploadModal()">
+    <i class="fa-solid fa-cloud-arrow-up"></i> <span>Upload Data</span>
+  </button>
+</header>
+
+<!-- MAIN PANEL -->
+<div id="main-panel">
+  <!-- WELCOME CARD -->
+  <div id="welcome-card">
+    <h1><span>Journe</span>lyst</h1>
+    <p>Visualize, explore, and share your personal travel history from Google Maps Timeline data. Upload your data to see all your trips on a beautiful interactive map.</p>
+    <div class="welcome-features">
+      <div class="wf-item">
+        <i class="fa-solid fa-map"></i>
+        <div>
+          <div class="wf-title">Trip Maps</div>
+          <div class="wf-text">Interactive maps with routes, stops & animated playback</div>
+        </div>
+      </div>
+      <div class="wf-item">
+        <i class="fa-solid fa-chart-bar"></i>
+        <div>
+          <div class="wf-title">Data Insights</div>
+          <div class="wf-text">Explore stats, distances, travel modes and more</div>
+        </div>
+      </div>
+      <div class="wf-item">
+        <i class="fa-solid fa-share-nodes"></i>
+        <div>
+          <div class="wf-title">Share</div>
+          <div class="wf-text">Export as image, HTML embed or animated video</div>
+        </div>
+      </div>
+      <div class="wf-item">
+        <i class="fa-solid fa-shield-halved"></i>
+        <div>
+          <div class="wf-title">100% Private</div>
+          <div class="wf-text">All data stays in your browser</div>
+        </div>
+      </div>
+    </div>
+    <div class="welcome-actions">
+      <button class="btn accent" onclick="openUploadModal()"><i class="fa-solid fa-cloud-arrow-up"></i> Upload Timeline Data</button>
+      <!-- button class="btn ghost" onclick="loadSampleData()"><i class="fa-solid fa-vial"></i> Load Demo Data</button-->
+    </div>
+  </div>
+
+  <!-- TRIPS SECTION -->
+  <div id="trips-section">
+  <div class="trips-header" onclick="handleTripsHeaderClick(event)" style="cursor:pointer;user-select:none;">
+      <h2>Your Trips</h2>
+      <span class="trip-count" id="trip-count-badge">0 trips</span>
+      <div style="margin-left:auto; display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation()">
+        <button class="btn sm ghost" id="btn-starred-filter" onclick="toggleShowStarredOnly()" title="Show starred trips only" style="padding:0 8px;height:30px;border-radius:6px;">
+          <i class="fa-regular fa-star"></i>
+        </button>
+        <button class="btn sm ghost" id="btn-view-mode" onclick="toggleTripsViewMode()" title="Switch to compact view" style="padding:0 8px;height:30px;border-radius:6px;">
+          <i class="fa-solid fa-list"></i>
+        </button>
+        <select id="cluster-criterion" class="btn sm ghost" style="padding:0 8px; font-size:11px; height:30px; border-radius:6px; background:var(--surface3); border:1px solid var(--border);" onchange="changeClusterCriterion(this.value)">
+          <option value="none" selected>No Grouping</option>
+          <option value="year">Group by Year</option>
+          <option value="region">Group by Region</option>
+          <option value="season">Group by Season</option>
+        </select>
+        <button class="btn sm ghost" onclick="openMergeModal()" data-tip="Merge two trips"><i class="fa-solid fa-code-merge"></i></button>
+      </div>
+      <button class="btn sm ghost" id="btn-trips-collapse" onclick="event.stopPropagation();toggleTripsCollapsed()" title="Collapse trips panel" style="padding:0 8px;height:30px;border-radius:6px;margin-left:2px;">
+        <i class="fa-solid fa-chevron-down" id="trips-collapse-icon"></i>
+      </button>
+    </div>
+
+    <!-- NESTED FILTER PANEL -->
+    <div id="filter-panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <strong style="font-size:13px;"><i class="fa-solid fa-sliders" style="margin-right:6px;color:var(--accent)"></i>Filter Trips</strong>
+        <button class="btn sm ghost" onclick="clearFilters()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+      </div>
+      <div class="filter-grid">
+        <div class="filter-group">
+          <label>From Date</label>
+          <input type="date" id="filter-date-from" onchange="applyFilters()">
+        </div>
+        <div class="filter-group">
+          <label>To Date</label>
+          <input type="date" id="filter-date-to" onchange="applyFilters()">
+        </div>
+        <div class="filter-group">
+          <label>Region / Country</label>
+          <input type="text" id="filter-region" placeholder="e.g. France, Texas..." oninput="applyFilters()">
+        </div>
+        <div class="filter-group">
+          <label>Min Duration (days)</label>
+          <input type="number" id="filter-min-dur" min="0" placeholder="0" oninput="applyFilters()">
+        </div>
+        <div class="filter-group">
+          <label>Max Duration (days)</label>
+          <input type="number" id="filter-max-dur" min="0" placeholder="any" oninput="applyFilters()">
+        </div>
+        <div class="filter-group">
+          <label>Travel Mode</label>
+          <select id="filter-mode" onchange="applyFilters()">
+            <option value="">All modes</option>
+            <option>Flight</option>
+            <option>Car</option>
+            <option>Train</option>
+            <option>Walking</option>
+          </select>
+        </div>
+        <div class="filter-group" style="display:flex;align-items:center;height:100%;margin-top:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-weight:500;color:var(--text)">
+            <input type="checkbox" id="filter-viewport" onchange="applyFilters()" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;">
+            Filter by map viewport
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div id="trips-grid">
+      <div class="empty-trips">
+        <i class="fa-solid fa-suitcase-rolling"></i>
+        <p>Upload your Google Maps Timeline data to see your trips here.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SIDE PANEL (Trip View) -->
+<div id="side-panel">
+  <!-- Mobile Toggle Tab -->
+  <button id="side-panel-toggle" onclick="toggleSidePanelMinimize()" data-tip="Toggle Panel">
+    <i class="fa-solid fa-chevron-right" id="sp-toggle-icon"></i>
+  </button>
+  <div class="sp-header">
+    <button class="sp-close" onclick="closeSidePanel()"><i class="fa-solid fa-xmark"></i></button>
+    <h2 id="sp-trip-name">Trip Details</h2>
+    <button class="btn sm ghost" id="sp-rename-btn" onclick="renameCurrentTrip()" data-tip="Rename Trip"><i class="fa-solid fa-pen"></i></button>
+    <button class="btn sm ghost" id="sp-edit-dates-btn" onclick="openEditTripModal()" data-tip="Edit Date Range"><i class="fa-solid fa-calendar-days"></i></button>
+    <button class="btn sm ghost" onclick="openShareTrip()" data-tip="Share Trip"><i class="fa-solid fa-share-nodes"></i></button>
+  </div>
+  <div class="sp-tabs">
+    <button class="sp-tab active" onclick="switchSpTab(this,'overview')">Overview</button>
+    <button class="sp-tab" onclick="switchSpTab(this,'stops')">Stops</button>
+    <button class="sp-tab" onclick="switchSpTab(this,'routes')">Routes</button>
+    <button class="sp-tab" onclick="switchSpTab(this,'customize')">Style</button>
+  </div>
+  <div class="sp-body" id="sp-body"></div>
+</div>
+
+<!-- TIMELINE BAR -->
+<div id="timeline-bar">
+  <div class="tl-controls">
+    <button class="tl-btn play-btn" id="tl-play-btn" onclick="togglePlayTimeline()" data-tip="Play timeline">
+      <i class="fa-solid fa-play" id="tl-play-icon"></i>
+    </button>
+    <button class="tl-btn" onclick="seekTimeline(-10)" data-tip="-10min"><i class="fa-solid fa-backward-step"></i></button>
+    <input type="range" class="tl-slider" id="tl-slider" min="0" max="1000" value="0" oninput="onTimelineSlider()">
+    <button class="tl-btn" onclick="seekTimeline(10)" data-tip="+10min"><i class="fa-solid fa-forward-step"></i></button>
+    <span class="tl-time" id="tl-time-display">--</span>
+    <button class="tl-btn" onclick="closeTimeline()" data-tip="Close"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+</div>
+
+<!-- MAP CONTROLS -->
+<div id="map-controls">
+  <button class="map-ctrl-btn" id="ctrl-timeline" data-tip="Timeline mode" onclick="toggleTimeline()"><i class="fa-solid fa-film"></i></button>
+  <button class="map-ctrl-btn" id="ctrl-basemap" data-tip="Change base map" onclick="toggleBasemapPicker()"><i class="fa-solid fa-layer-group"></i></button>
+  <button class="map-ctrl-btn" onclick="map.locate({setView:true, maxZoom:12})" data-tip="My location"><i class="fa-solid fa-location-crosshairs"></i></button>
+  <button class="map-ctrl-btn" onclick="map.zoomIn()" data-tip="Zoom in"><i class="fa-solid fa-plus"></i></button>
+  <button class="map-ctrl-btn" onclick="map.zoomOut()" data-tip="Zoom out"><i class="fa-solid fa-minus"></i></button>
+</div>
+
+<!-- BASEMAP PICKER -->
+<div id="basemap-picker">
+  <h4>Base Map</h4>
+  <div id="basemap-list"></div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div id="settings-panel">
+  <div class="adv-header" style="padding:14px 16px;">
+    <h2 style="font-size:15px;">Settings</h2>
+    <button class="sp-close" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+  <div style="overflow-y:auto;flex:1;">
+    <div class="settings-section">
+      <h4>Display</h4>
+      <div class="setting-row">
+        <span class="setting-label">Show route paths</span>
+        <button class="toggle on" id="tog-paths" onclick="this.classList.toggle('on');renderCurrentTrip()"></button>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Show stop markers</span>
+        <button class="toggle on" id="tog-markers" onclick="this.classList.toggle('on');renderCurrentTrip()"></button>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Show flight arcs</span>
+        <button class="toggle on" id="tog-flights" onclick="this.classList.toggle('on');renderCurrentTrip()"></button>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Animate paths</span>
+        <button class="toggle off" id="tog-animate" onclick="this.classList.toggle('on');renderCurrentTrip()"></button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h4>Preprocessing</h4>
+      <div class="range-row">
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span>Trip gap threshold (hours)</span>
+          <span id="trip-gap-val">48</span>
+        </div>
+        <input type="range" min="1" max="120" value="60" oninput="document.getElementById('trip-gap-val').textContent=this.value;SETTINGS.tripGapHours=+this.value" onchange="reprocessData()">
+      </div>
+      <div class="range-row">
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span>Min trip duration (hours)</span>
+          <span id="min-trip-val">5</span>
+        </div>
+        <input type="range" min="0" max="24" value="5" oninput="document.getElementById('min-trip-val').textContent=this.value;SETTINGS.minTripHours=+this.value" onchange="reprocessData()">
+      </div>
+      <div class="range-row">
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span>Max trip duration (days)</span>
+          <span id="max-trip-days-val">60</span>
+        </div>
+        <input type="range" min="1" max="180" value="60" oninput="document.getElementById('max-trip-days-val').textContent=this.value;SETTINGS.maxTripDays=+this.value" onchange="reprocessData()">
+      </div>
+      <div class="range-row">
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span>Max distance between stops (km)</span>
+          <span id="max-stop-dist-val">1000</span>
+        </div>
+        <input type="range" min="50" max="5000" step="50" value="1000" oninput="document.getElementById('max-stop-dist-val').textContent=this.value;SETTINGS.maxDistanceBetweenStopsKm=+this.value" onchange="reprocessData()">
+      </div>
+      <div class="range-row">
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span>Home detection radius (m)</span>
+          <span id="home-radius-val">500</span>
+        </div>
+        <input type="range" min="50" max="1000" value="500" step="50" oninput="document.getElementById('home-radius-val').textContent=this.value;SETTINGS.homeRadiusM=+this.value" onchange="reprocessData()">
+      </div>
+      <div class="range-row">
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span>Min stop probability</span>
+          <span id="min-visit-prob-val">0.35</span>
+        </div>
+        <input type="range" min="0.0" max="1.0" step="0.05" value="0.25" oninput="document.getElementById('min-visit-prob-val').textContent=(+this.value).toFixed(2);SETTINGS.minVisitProbability=+this.value" onchange="reprocessData()">
+      </div>
+      <div class="range-row">
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span>Min route activity probability</span>
+          <span id="min-act-prob-val">0.25</span>
+        </div>
+        <input type="range" min="0.0" max="1.0" step="0.05" value="0.25" oninput="document.getElementById('min-act-prob-val').textContent=(+this.value).toFixed(2);SETTINGS.minActivityProbability=+this.value" onchange="reprocessData()">
+      </div>
+      <button class="btn sm accent" style="margin-top:8px" onclick="reprocessData()"><i class="fa-solid fa-rotate"></i> Reprocess Data</button>
+    </div>
+    <div class="settings-section">
+      <h4>Line Style</h4>
+      <div class="setting-row">
+        <span class="setting-label">Path color</span>
+        <input type="color" id="path-color" value="#4fffb0" oninput="SETTINGS.pathColor=this.value;renderCurrentTrip()" style="width:40px;height:28px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer">
+      </div>
+      <div class="range-row">
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span>Path thickness</span>
+          <span id="path-thick-val">5</span>
+        </div>
+        <input type="range" min="1" max="8" value="5" oninput="document.getElementById('path-thick-val').textContent=this.value;SETTINGS.pathWidth=+this.value;renderCurrentTrip()">
+      </div>
+      <div class="setting-row" style="margin-top:10px;">
+        <span class="setting-label">Flight path color</span>
+        <input type="color" id="flight-color" value="#a0a0a0" oninput="SETTINGS.flightColor=this.value;renderCurrentTrip()" style="width:40px;height:28px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer">
+      </div>
+      <div class="range-row">
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span>Flight path thickness</span>
+          <span id="flight-thick-val">5</span>
+        </div>
+        <input type="range" min="1" max="8" value="5" oninput="document.getElementById('flight-thick-val').textContent=this.value;SETTINGS.flightWidth=+this.value;renderCurrentTrip()">
+      </div>
+    </div>
+    <div class="settings-section">
+      <h4>Marker Style</h4>
+      <div class="setting-row">
+        <span class="setting-label">Marker color</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <select id="marker-color-select" onchange="document.getElementById('marker-custom-color').value=this.value;SETTINGS.markerColor=this.value;renderCurrentTrip()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;height:28px;padding:0 8px;font-size:12px;width:120px;">
+            <option value="#4fffb0">Vibrant Mint</option>
+            <option value="#3b82f6">Royal Blue</option>
+            <option value="#ec4899">Coral Pink</option>
+            <option value="#a855f7">Electric Purple</option>
+            <option value="#ff7a00">Neon Orange</option>
+            <option value="#ff3333">Crimson Red</option>
+          </select>
+          <input type="color" id="marker-custom-color" value="#4fffb0" oninput="SETTINGS.markerColor=this.value;renderCurrentTrip()" style="width:30px;height:28px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer">
+        </div>
+      </div>
+      <div class="setting-row" style="margin-top:10px;">
+        <span class="setting-label">Marker icon</span>
+        <select id="marker-icon-select" onchange="SETTINGS.markerIcon=this.value;renderCurrentTrip()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;height:28px;padding:0 8px;font-size:12px;width:156px;">
+          <option value="fa-location-dot">Location Pin</option>
+          <option value="fa-map-pin">Map Pin</option>
+          <option value="fa-compass">Compass</option>
+          <option value="fa-flag">Flag</option>
+          <option value="fa-star">Star</option>
+          <option value="fa-camera">Camera</option>
+          <option value="fa-heart">Heart</option>
+        </select>
+      </div>
+      <div class="setting-row" style="margin-top:10px;">
+        <span class="setting-label">Marker size</span>
+        <select id="marker-size-select" onchange="SETTINGS.markerSize=this.value;renderCurrentTrip()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;height:28px;padding:0 8px;font-size:12px;width:156px;">
+          <option value="small">Small (20px)</option>
+          <option value="medium-small">Medium Small (24px)</option>
+          <option value="medium" selected>Medium (28px)</option>
+          <option value="large">Large (34px)</option>
+          <option value="extra-large">Extra Large (40px)</option>
+        </select>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h4>Data</h4>
+      <button class="btn sm danger" onclick="clearAllData()"><i class="fa-solid fa-trash"></i> Clear All Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADVANCED PANEL -->
+<div id="advanced-panel">
+  <div class="adv-header">
+    <button class="btn sm ghost" onclick="closeAdvanced()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+    <h2>Data Explorer</h2>
+    <div class="adv-tabs">
+      <button class="adv-tab active" onclick="switchAdvTab(this,'trips-data')">Trips</button>
+      <button class="adv-tab" onclick="switchAdvTab(this,'visits-data')">Visits</button>
+      <button class="adv-tab" onclick="switchAdvTab(this,'activities-data')">Activities</button>
+      <button class="adv-tab" onclick="switchAdvTab(this,'paths-data')">Paths</button>
+      <button class="adv-tab" onclick="switchAdvTab(this,'raw-data')">Raw JSON</button>
+    </div>
+  </div>
+  <div class="adv-body" id="adv-body"></div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="modal-overlay" id="upload-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-cloud-arrow-up" style="color:var(--accent);margin-right:8px"></i>Upload Timeline Data</h3>
+      <button class="modal-close" onclick="closeModal('upload-modal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Upload your Google Maps Timeline export in JSON format. You can upload multiple files and data will be merged.</p>
+      <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        <i class="fa-solid fa-file-arrow-up"></i>
+        <p>Drag &amp; drop your JSON file here, or <strong>click to browse</strong><br>
+        <small style="color:var(--text3)">Accepts: .json files · Multiple files supported</small></p>
+      </div>
+      <input type="file" id="file-input" class="file-input" accept=".json" multiple onchange="onFileSelect(event)">
+
+      <div id="upload-progress" style="display:none;margin-top:12px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <div class="spinner"></div>
+          <span style="font-size:13px;" id="upload-status">Processing...</span>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+      </div>
+
+      <div class="expandable">
+        <button class="expand-toggle" onclick="toggleExpand('export-guide')">
+          <span><i class="fa-solid fa-circle-question" style="margin-right:6px"></i>How to export from Google Maps</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </button>
+        <div class="expand-content" id="export-guide">
+          <ol>
+            <li>Open the <strong>Google Maps</strong> app on your phone</li>
+            <li>Tap your profile picture → <strong>Your Timeline</strong></li>
+            <li>Tap the <strong>⋮</strong> menu → <strong>Settings and privacy</strong></li>
+            <li>Scroll to <strong>Location settings</strong> → <strong>Export Timeline data</strong></li>
+            <li>Choose a date range and tap <strong>Export</strong></li>
+            <li>The file will be sent to your email or saved to Google Drive</li>
+            <li>Download the <code>.json</code> file and upload it here</li>
+          </ol>
+          <p style="margin-top:8px;color:var(--text3);font-size:11px;">Note: Timeline data may also be in <code>Timeline.json</code> or folder exports from <strong>Google Takeout</strong>.</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn ghost" onclick="closeModal('upload-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="modal-overlay" id="share-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-share-nodes" style="color:var(--accent);margin-right:8px"></i>Share <span id="share-modal-title">Trip</span></h3>
+      <button class="modal-close" onclick="closeModal('share-modal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="share-options">
+        <div class="share-opt" onclick="shareAsHTML()">
+          <i class="fa-solid fa-code"></i>
+          <span>HTML Embed</span>
+        </div>
+        <div class="share-opt" onclick="shareAsImage()">
+          <i class="fa-solid fa-image"></i>
+          <span>High-Res Image</span>
+        </div>
+        <div class="share-opt" onclick="shareAsVideo()">
+          <i class="fa-solid fa-film"></i>
+          <span>Animated Video</span>
+        </div>
+      </div>
+      <div id="share-status" style="margin-top:14px;font-size:12px;color:var(--text2);display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn ghost" onclick="closeModal('share-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- RENAME MODAL -->
+<div class="modal-overlay" id="rename-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Rename Trip</h3>
+      <button class="modal-close" onclick="closeModal('rename-modal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="filter-group">
+        <label>Trip Name</label>
+        <input type="text" id="rename-input" style="width:100%;height:38px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);padding:0 12px;font-size:14px;" onkeydown="if(event.key==='Enter')confirmRename()">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn ghost" onclick="closeModal('rename-modal')">Cancel</button>
+      <button class="btn accent" onclick="confirmRename()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT TRIP DATES MODAL -->
+<div class="modal-overlay" id="edit-trip-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Edit Trip Date Range</h3>
+      <button class="modal-close" onclick="closeModal('edit-trip-modal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px; color:var(--text2); margin-bottom:12px;">Manually override this trip's start and end times. Preprocessing will group events accordingly.</p>
+      <div class="filter-group" style="margin-bottom:12px;">
+        <label>Start Date &amp; Time</label>
+        <input type="datetime-local" id="edit-trip-start" style="width:100%;height:38px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);padding:0 12px;font-size:14px;">
+      </div>
+      <div class="filter-group">
+        <label>End Date &amp; Time</label>
+        <input type="datetime-local" id="edit-trip-end" style="width:100%;height:38px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);padding:0 12px;font-size:14px;">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn ghost" onclick="closeModal('edit-trip-modal')">Cancel</button>
+      <button class="btn accent" onclick="confirmEditTrip()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MERGE MODAL -->
+<div class="modal-overlay" id="merge-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Merge Trips</h3>
+      <button class="modal-close" onclick="closeModal('merge-modal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Select two trips to merge into one.</p>
+      <div class="merge-trip-select" id="merge-trip-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn ghost" onclick="closeModal('merge-modal')">Cancel</button>
+      <button class="btn accent" onclick="confirmMerge()">Merge Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- DATABASE EDIT MODAL -->
+<div class="modal-overlay" id="db-edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="db-edit-title">Edit Record</h3>
+      <button class="modal-close" onclick="closeModal('db-edit-modal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body" id="db-edit-body" style="max-height: 450px; overflow-y: auto;">
+      <!-- Dynamic form fields -->
+    </div>
+    <div class="modal-footer">
+      <button class="btn ghost" onclick="closeModal('db-edit-modal')">Cancel</button>
+      <button class="btn accent" id="db-edit-save-btn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
+
+<script src="js/state.js"></script>
+<script src="js/helpers.js"></script>
+<script src="js/processing.js"></script>
+<script src="js/map.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/export.js"></script>
+<script src="js/init.js"></script>
+</body>
+</html>
